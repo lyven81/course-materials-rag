@@ -13,6 +13,17 @@ class SearchResults:
     distances: List[float]
     error: Optional[str] = None
     
+    def get_relevance_scores(self) -> List[float]:
+        """Convert distances to relevance scores (0-1, where 1 is most relevant)"""
+        if not self.distances:
+            return []
+        
+        # Convert cosine distances to similarity scores
+        # ChromaDB returns cosine distances, so smaller distance = more similar
+        # For cosine distance: 0 = identical, 2 = opposite
+        # Convert to relevance score: 1 = most relevant, 0 = least relevant
+        return [max(0.0, 1.0 - (dist / 2.0)) for dist in self.distances]
+    
     @classmethod
     def from_chroma(cls, chroma_results: Dict) -> 'SearchResults':
         """Create SearchResults from ChromaDB query results"""
@@ -265,3 +276,22 @@ class VectorStore:
         except Exception as e:
             print(f"Error getting lesson link: {e}")
     
+    def get_lesson_title(self, course_title: str, lesson_number: int) -> Optional[str]:
+        """Get lesson title for a given course title and lesson number"""
+        import json
+        try:
+            # Get course by ID (title is the ID)
+            results = self.course_catalog.get(ids=[course_title])
+            if results and 'metadatas' in results and results['metadatas']:
+                metadata = results['metadatas'][0]
+                lessons_json = metadata.get('lessons_json')
+                if lessons_json:
+                    lessons = json.loads(lessons_json)
+                    # Find the lesson with matching number
+                    for lesson in lessons:
+                        if lesson.get('lesson_number') == lesson_number:
+                            return lesson.get('lesson_title')
+            return None
+        except Exception as e:
+            print(f"Error getting lesson title: {e}")
+            return None

@@ -20,3 +20,14 @@ class CourseChunk(BaseModel):
     course_title: str                   # Which course this chunk belongs to
     lesson_number: Optional[int] = None # Which lesson this chunk is from
     chunk_index: int                    # Position of this chunk in the document
+
+class SourceObject(BaseModel):
+    """Enhanced source object with rich metadata for citations"""
+    course_title: str                   # Course title
+    lesson_number: Optional[int] = None # Lesson number if applicable
+    lesson_title: Optional[str] = None  # Lesson title if available
+    content_snippet: str                # Preview of the content
+    course_link: Optional[str] = None   # Link to the course
+    lesson_link: Optional[str] = None   # Link to the specific lesson
+    relevance_score: float              # How relevant this source is (0-1)
+    citation_id: int                    # Unique identifier for inline citation

@@ -218,31 +218,275 @@ header h1 {
     text-align: right;
 }
 
+/* Source Summary */
+.source-summary {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary-color);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
 /* Collapsible Sources */
 .sources-collapsible {
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+    margin-top: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.1);
 }
 
 .sources-collapsible summary {
     cursor: pointer;
-    padding: 0.25rem 0.5rem;
+    padding: 0.75rem;
     user-select: none;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 7px 7px 0 0;
+    transition: all 0.2s ease;
 }
 
 .sources-collapsible summary:hover {
     color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.15);
 }
 
 .sources-collapsible[open] summary {
-    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 7px 7px 0 0;
 }
 
-.sources-content {
-    padding: 0 0.5rem 0.25rem 1.5rem;
+/* Sources Container */
+.sources-container {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Source Cards */
+.source-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    background: var(--surface);
+    transition: all 0.2s ease;
+}
+
+.source-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+}
+
+.source-card.high-confidence {
+    border-left: 4px solid #10b981;
+}
+
+.source-card.medium-confidence {
+    border-left: 4px solid #f59e0b;
+}
+
+.source-card.low-confidence {
+    border-left: 4px solid #ef4444;
+}
+
+.source-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.source-citation-number {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 2rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.source-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.source-course-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+}
+
+.source-course-title a {
+    color: var(--primary-color);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    transition: all 0.2s ease;
+    font-weight: 600;
+}
+
+.source-course-title a:hover {
+    background: rgba(37, 99, 235, 0.15);
+    border-color: rgba(37, 99, 235, 0.4);
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+
+.source-course-title a::after {
+    content: "🔗";
+    font-size: 0.7em;
+    opacity: 0.7;
+}
+
+.source-lesson-info {
+    font-size: 0.8rem;
     color: var(--text-secondary);
+    line-height: 1.3;
+    margin-top: 0.3rem;
+}
+
+.source-lesson-info a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    background: rgba(148, 163, 184, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.source-lesson-info a:hover {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: rgba(37, 99, 235, 0.3);
+    color: var(--primary-color);
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+
+.source-lesson-info a::after {
+    content: "📖";
+    font-size: 0.65em;
+    opacity: 0.8;
+}
+
+.source-confidence {
+    flex-shrink: 0;
+    width: 60px;
+}
+
+.confidence-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+}
+
+.confidence-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+    border-radius: 2px;
+}
+
+.source-card.high-confidence .confidence-fill {
+    background: #10b981;
+}
+
+.source-card.medium-confidence .confidence-fill {
+    background: #f59e0b;
+}
+
+.source-card.low-confidence .confidence-fill {
+    background: #ef4444;
+}
+
+/* Source Preview */
+.source-preview {
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.5rem;
+}
+
+.source-preview summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: 0.25rem 0;
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.source-preview summary:hover {
+    color: var(--primary-color);
+}
+
+.source-preview[open] summary {
+    margin-bottom: 0.5rem;
+}
+
+.source-snippet {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    border-left: 3px solid var(--border-color);
+    font-style: italic;
+}
+
+/* Remove old sources-content style */
+.sources-content {
+    display: none;
+}
+
+/* Inline Citations */
+.inline-citation {
+    display: inline-block;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin: 0 0.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    vertical-align: baseline;
+}
+
+.inline-citation:hover,
+.inline-citation.highlighted {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+/* Source Card Highlighting */
+.source-card.highlighted {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3), 0 4px 12px rgba(37, 99, 235, 0.2) !important;
+    background: rgba(37, 99, 235, 0.05);
+    transform: translateY(-2px);
 }
 
 /* Markdown formatting styles */
@@ -599,6 +843,40 @@ details[open] .suggested-header::before {
     color: var(--text-secondary);
     font-style: italic;
     text-transform: none;
+}
+
+/* New Chat Button */
+.new-chat-button {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem 0;
+    border: none;
+    background: none;
+    list-style: none;
+    outline: none;
+    transition: color 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: left;
+    width: 100%;
+}
+
+.new-chat-button:focus {
+    color: var(--primary-color);
+}
+
+.new-chat-button:hover {
+    color: var(--primary-color);
+}
+
+.new-chat-button::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 0.5rem;
+    transition: transform 0.2s ease;
+    font-size: 0.75rem;
 }
 
 /* Suggested Questions in Sidebar */

@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('sendButton');
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
+    newChatButton = document.getElementById('newChatButton');
     
     setupEventListeners();
     createNewSession();
@@ -28,6 +29,9 @@ function setupEventListeners() {
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
+    
+    // New chat functionality
+    newChatButton.addEventListener('click', createNewSession);
     
     
     // Suggested questions
@@ -82,7 +86,7 @@ async function sendMessage() {
 
         // Replace loading message with response
         loadingMessage.remove();
-        addMessage(data.answer, 'assistant', data.sources);
+        addMessage(data.answer, 'assistant', data.sources, data.source_summary);
 
     } catch (error) {
         // Replace loading message with error
@@ -110,31 +114,194 @@ function createLoadingMessage() {
     return messageDiv;
 }
 
-function addMessage(content, type, sources = null, isWelcome = false) {
+function addMessage(content, type, sources = null, sourceSummary = null, isWelcome = false) {
     const messageId = Date.now();
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}${isWelcome ? ' welcome-message' : ''}`;
     messageDiv.id = `message-${messageId}`;
     
     // Convert markdown to HTML for assistant messages
-    const displayContent = type === 'assistant' ? marked.parse(content) : escapeHtml(content);
+    let displayContent = type === 'assistant' ? marked.parse(content) : escapeHtml(content);
+    
+    // Add inline citations if sources are available
+    if (sources && sources.length > 0 && type === 'assistant') {
+        displayContent = addInlineCitations(displayContent, sources);
+    }
     
     let html = `<div class="message-content">${displayContent}</div>`;
     
+    // Add source summary if available
+    if (sourceSummary) {
+        html += `<div class="source-summary">${sourceSummary}</div>`;
+    }
+    
     if (sources && sources.length > 0) {
-        html += `
-            <details class="sources-collapsible">
-                <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
-            </details>
-        `;
+        html += createSourcesSection(sources);
     }
     
     messageDiv.innerHTML = html;
+    
+    // Add click handlers for inline citations
+    if (sources && sources.length > 0) {
+        addCitationClickHandlers(messageDiv);
+    }
+    
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
     return messageId;
+}
+
+function addInlineCitations(content, sources) {
+    // This is a simple implementation that adds citations at the end of sentences
+    // In a more sophisticated version, you could use NLP to match content to sources
+    
+    if (!sources || sources.length === 0) return content;
+    
+    // Add citations to sentences that end with periods, but avoid citations in code blocks
+    // Simple heuristic: add citations after sentences that seem to contain factual information
+    const sentences = content.split('.');
+    let citationIndex = 0;
+    
+    return sentences.map((sentence, index) => {
+        if (index === sentences.length - 1) return sentence; // Don't modify the last fragment
+        
+        // Skip if sentence is too short or is likely in a code block
+        if (sentence.trim().length < 20 || sentence.includes('<code>') || sentence.includes('```')) {
+            return sentence + '.';
+        }
+        
+        // Add citation if we still have sources to cite
+        if (citationIndex < sources.length) {
+            const citationId = sources[citationIndex].citation_id;
+            citationIndex++;
+            return sentence + `<span class="inline-citation" data-citation-id="${citationId}">[${citationId}]</span>.`;
+        }
+        
+        return sentence + '.';
+    }).join('');
+}
+
+function createSourcesSection(sources) {
+    // Create rich source cards instead of simple text
+    let sourcesHtml = `
+        <details class="sources-collapsible">
+            <summary class="sources-header">Sources (${sources.length})</summary>
+            <div class="sources-container">
+    `;
+    
+    sources.forEach((source, index) => {
+        const confidenceClass = getConfidenceClass(source.relevance_score);
+        const lessonText = source.lesson_number ? `Lesson ${source.lesson_number}` : '';
+        const lessonTitle = source.lesson_title ? `: ${source.lesson_title}` : '';
+        
+        sourcesHtml += `
+            <div class="source-card ${confidenceClass}" data-citation-id="${source.citation_id}">
+                <div class="source-header">
+                    <div class="source-citation-number">[${source.citation_id}]</div>
+                    <div class="source-info">
+                        <div class="source-course-title">
+                            ${source.course_link ? 
+                                `<a href="${source.course_link}" target="_blank">${source.course_title}</a>` : 
+                                source.course_title
+                            }
+                        </div>
+                        ${lessonText || lessonTitle ? 
+                            `<div class="source-lesson-info">
+                                ${source.lesson_link ? 
+                                    `<a href="${source.lesson_link}" target="_blank">${lessonText}${lessonTitle}</a>` :
+                                    `${lessonText}${lessonTitle}`
+                                }
+                            </div>` : ''
+                        }
+                    </div>
+                    <div class="source-confidence" title="Relevance: ${Math.round(source.relevance_score * 100)}%">
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${source.relevance_score * 100}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <details class="source-preview">
+                    <summary class="source-preview-toggle">Show preview</summary>
+                    <div class="source-snippet">${source.content_snippet}</div>
+                </details>
+            </div>
+        `;
+    });
+    
+    sourcesHtml += `
+            </div>
+        </details>
+    `;
+    
+    return sourcesHtml;
+}
+
+function getConfidenceClass(relevanceScore) {
+    if (relevanceScore >= 0.8) return 'high-confidence';
+    if (relevanceScore >= 0.6) return 'medium-confidence';
+    return 'low-confidence';
+}
+
+function addCitationClickHandlers(messageDiv) {
+    // Add click handlers to inline citations
+    const inlineCitations = messageDiv.querySelectorAll('.inline-citation');
+    inlineCitations.forEach(citation => {
+        citation.addEventListener('click', (e) => {
+            e.preventDefault();
+            const citationId = citation.getAttribute('data-citation-id');
+            highlightSourceCard(messageDiv, citationId);
+            
+            // Open the sources section if it's closed
+            const sourcesCollapsible = messageDiv.querySelector('.sources-collapsible');
+            if (sourcesCollapsible && !sourcesCollapsible.open) {
+                sourcesCollapsible.open = true;
+            }
+        });
+    });
+    
+    // Add hover handlers for source cards
+    const sourceCards = messageDiv.querySelectorAll('.source-card');
+    sourceCards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            const citationId = card.getAttribute('data-citation-id');
+            highlightInlineCitation(messageDiv, citationId);
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            clearInlineCitationHighlights(messageDiv);
+        });
+    });
+}
+
+function highlightSourceCard(messageDiv, citationId) {
+    // Clear existing highlights
+    const allCards = messageDiv.querySelectorAll('.source-card');
+    allCards.forEach(card => card.classList.remove('highlighted'));
+    
+    // Highlight the target card
+    const targetCard = messageDiv.querySelector(`[data-citation-id="${citationId}"]`);
+    if (targetCard) {
+        targetCard.classList.add('highlighted');
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+            targetCard.classList.remove('highlighted');
+        }, 2000);
+    }
+}
+
+function highlightInlineCitation(messageDiv, citationId) {
+    const citation = messageDiv.querySelector(`.inline-citation[data-citation-id="${citationId}"]`);
+    if (citation) {
+        citation.classList.add('highlighted');
+    }
+}
+
+function clearInlineCitationHighlights(messageDiv) {
+    const citations = messageDiv.querySelectorAll('.inline-citation.highlighted');
+    citations.forEach(citation => citation.classList.remove('highlighted'));
 }
 
 // Helper function to escape HTML for user messages
@@ -147,9 +314,24 @@ function escapeHtml(text) {
 // Removed removeMessage function - no longer needed since we handle loading differently
 
 async function createNewSession() {
+    // Clear current session state
     currentSessionId = null;
+    
+    // Clear chat messages
     chatMessages.innerHTML = '';
-    addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+    
+    // Clear input field 
+    chatInput.value = '';
+    
+    // Re-enable input in case it was disabled
+    chatInput.disabled = false;
+    sendButton.disabled = false;
+    
+    // Add welcome message
+    addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, null, true);
+    
+    // Focus input for immediate typing
+    chatInput.focus();
 }
 
 // Load course statistics

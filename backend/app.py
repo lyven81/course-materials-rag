@@ -11,6 +11,7 @@ import os
 
 from config import config
 from rag_system import RAGSystem
+from models import SourceObject
 
 # Initialize FastAPI app
 app = FastAPI(title="Course Materials RAG System", root_path="")
@@ -43,8 +44,9 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     """Response model for course queries"""
     answer: str
-    sources: List[str]
+    sources: List[SourceObject]
     session_id: str
+    source_summary: Optional[str] = None  # Summary like "Based on 3 courses, 5 lessons"
 
 class CourseStats(BaseModel):
     """Response model for course statistics"""
@@ -63,12 +65,13 @@ async def query_documents(request: QueryRequest):
             session_id = rag_system.session_manager.create_session()
         
         # Process query using RAG system
-        answer, sources = rag_system.query(request.query, session_id)
+        answer, sources, source_summary = rag_system.query(request.query, session_id)
         
         return QueryResponse(
             answer=answer,
             sources=sources,
-            session_id=session_id
+            session_id=session_id,
+            source_summary=source_summary
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -4,8 +4,8 @@ from document_processor import DocumentProcessor
 from vector_store import VectorStore
 from ai_generator import AIGenerator
 from session_manager import SessionManager
-from search_tools import ToolManager, CourseSearchTool
-from models import Course, Lesson, CourseChunk
+from search_tools import ToolManager, CourseSearchTool, CourseOutlineTool
+from models import Course, Lesson, CourseChunk, SourceObject
 
 class RAGSystem:
     """Main orchestrator for the Retrieval-Augmented Generation system"""
@@ -22,7 +22,9 @@ class RAGSystem:
         # Initialize search tools
         self.tool_manager = ToolManager()
         self.search_tool = CourseSearchTool(self.vector_store)
+        self.outline_tool = CourseOutlineTool(self.vector_store)
         self.tool_manager.register_tool(self.search_tool)
+        self.tool_manager.register_tool(self.outline_tool)
     
     def add_course_document(self, file_path: str) -> Tuple[Course, int]:
         """
@@ -99,7 +101,7 @@ class RAGSystem:
         
         return total_courses, total_chunks
     
-    def query(self, query: str, session_id: Optional[str] = None) -> Tuple[str, List[str]]:
+    def query(self, query: str, session_id: Optional[str] = None) -> Tuple[str, List[SourceObject], Optional[str]]:
         """
         Process a user query using the RAG system with tool-based search.
         
@@ -108,7 +110,7 @@ class RAGSystem:
             session_id: Optional session ID for conversation context
             
         Returns:
-            Tuple of (response, sources list - empty for tool-based approach)
+            Tuple of (response, SourceObject list, source_summary)
         """
         # Create prompt for the AI with clear instructions
         prompt = f"""Answer this question about course materials: {query}"""
@@ -128,6 +130,9 @@ class RAGSystem:
         
         # Get sources from the search tool
         sources = self.tool_manager.get_last_sources()
+        
+        # Create source summary
+        source_summary = self._create_source_summary(sources)
 
         # Reset sources after retrieving them
         self.tool_manager.reset_sources()
@@ -136,8 +141,29 @@ class RAGSystem:
         if session_id:
             self.session_manager.add_exchange(session_id, query, response)
         
-        # Return response with sources from tool searches
-        return response, sources
+        # Return response with SourceObject instances and summary
+        return response, sources, source_summary
+    
+    def _create_source_summary(self, sources: List[SourceObject]) -> Optional[str]:
+        """Create a summary of sources used in the response"""
+        if not sources:
+            return None
+        
+        # Count unique courses and lessons
+        unique_courses = set()
+        lesson_count = 0
+        
+        for source in sources:
+            unique_courses.add(source.course_title)
+            if source.lesson_number is not None:
+                lesson_count += 1
+        
+        # Create summary text
+        course_count = len(unique_courses)
+        if lesson_count > 0:
+            return f"Based on {course_count} course{'s' if course_count != 1 else ''}, {lesson_count} lesson{'s' if lesson_count != 1 else ''}"
+        else:
+            return f"Based on {course_count} course{'s' if course_count != 1 else ''}"
     
     def get_course_analytics(self) -> Dict:
         """Get analytics about the course catalog"""

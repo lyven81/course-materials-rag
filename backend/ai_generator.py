@@ -1,25 +1,84 @@
 import anthropic
 from typing import List, Optional, Dict, Any
+from dataclasses import dataclass
+
+
+@dataclass
+class RoundContext:
+    """Manages conversation state across rounds"""
+    
+    def __init__(self, initial_query: str, conversation_history: Optional[str] = None):
+        self.messages: List[Dict] = [{"role": "user", "content": initial_query}]
+        self.round_number: int = 1
+        self.conversation_history = conversation_history
+        
+    def add_assistant_message(self, content):
+        """Add assistant's response to message history"""
+        self.messages.append({"role": "assistant", "content": content})
+        
+    def add_user_message(self, content):
+        """Add user message (typically tool results) to history"""
+        self.messages.append({"role": "user", "content": content})
+        
+    def increment_round(self):
+        """Move to next round"""
+        self.round_number += 1
+
+
+@dataclass
+class RoundResult:
+    """Encapsulates results from a single round"""
+    response: Any
+    has_tool_use: bool
+    execution_success: bool = True
+    error: Optional[str] = None
+    
+    def get_text_content(self) -> str:
+        """Extract text content from response"""
+        if hasattr(self.response, 'content') and self.response.content:
+            return self.response.content[0].text
+        return ""
+
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
     
     # Static system prompt to avoid rebuilding on each call
-    SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to a comprehensive search tool for course information.
+    SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to comprehensive tools for course information.
 
-Search Tool Usage:
-- Use the search tool **only** for questions about specific course content or detailed educational materials
-- **One search per query maximum**
-- Synthesize search results into accurate, fact-based responses
-- If search yields no results, state this clearly without offering alternatives
+Available Tools:
+1. **Course Content Search**: For questions about specific topics within course materials
+2. **Course Outline**: For questions about course structure, lesson lists, or course overviews
+
+Tool Usage Guidelines:
+- Use content search for **specific topic questions** within course materials
+- Use course outline for **structural questions** about course organization, lesson lists, or course overviews
+- **Multi-round tool usage allowed**: You can use tools up to 2 times per query to gather comprehensive information
+- **Sequential reasoning**: Use results from previous tool calls to inform subsequent searches
+- Synthesize tool results into accurate, fact-based responses
+- If tool yields no results, state this clearly without offering alternatives
+
+Multi-Round Strategy:
+- **Round 1**: Gather initial information or course structure
+- **Round 2**: Perform targeted searches based on Round 1 results
+- Examples:
+  - Round 1: Get course outline to find lesson titles
+  - Round 2: Search specific lessons based on titles found
+  - Round 1: Search broad topic
+  - Round 2: Search related or comparative information
+
+When using the course outline tool, always include:
+- Course title
+- Course link (if available)
+- Complete lesson list with numbers and titles
+- Lesson links (if available)
 
 Response Protocol:
-- **General knowledge questions**: Answer using existing knowledge without searching
-- **Course-specific questions**: Search first, then answer
+- **General knowledge questions**: Answer using existing knowledge without tool usage
+- **Course-specific questions**: Use appropriate tool first, then answer
 - **No meta-commentary**:
- - Provide direct answers only — no reasoning process, search explanations, or question-type analysis
- - Do not mention "based on the search results"
-
+ - Provide direct answers only — no reasoning process, tool explanations, or question-type analysis
+ - Do not mention "based on the search results" or "using the tool"
 
 All responses must be:
 1. **Brief, Concise and focused** - Get to the point quickly
@@ -46,6 +105,7 @@ Provide only the direct answer to what was asked.
                          tool_manager=None) -> str:
         """
         Generate AI response with optional tool usage and conversation context.
+        Supports up to 2 sequential tool calling rounds.
         
         Args:
             query: The user's question or request
@@ -57,37 +117,167 @@ Provide only the direct answer to what was asked.
             Generated response as string
         """
         
-        # Build system content efficiently - avoid string ops when possible
+        # If no tools or tool manager, use single round logic
+        if not tools or not tool_manager:
+            return self._generate_single_round_response(query, conversation_history, tools)
+        
+        # Use sequential rounds for tool-enabled queries
+        return self._execute_sequential_rounds(query, conversation_history, tools, tool_manager)
+    
+    def _generate_single_round_response(self, query: str, conversation_history: Optional[str] = None, tools: Optional[List] = None) -> str:
+        """Generate a single round response without tools (backward compatibility)"""
         system_content = (
             f"{self.SYSTEM_PROMPT}\n\nPrevious conversation:\n{conversation_history}"
             if conversation_history 
             else self.SYSTEM_PROMPT
         )
         
-        # Prepare API call parameters efficiently
         api_params = {
             **self.base_params,
             "messages": [{"role": "user", "content": query}],
             "system": system_content
         }
         
-        # Add tools if available
+        # Add tools if available (for cases where tools exist but no tool_manager)
         if tools:
             api_params["tools"] = tools
             api_params["tool_choice"] = {"type": "auto"}
         
-        # Get response from Claude
         response = self.client.messages.create(**api_params)
         
-        # Handle tool execution if needed
-        if response.stop_reason == "tool_use" and tool_manager:
-            return self._handle_tool_execution(response, api_params, tool_manager)
+        # If tools were used but no tool manager, fall back to legacy behavior
+        if response.stop_reason == "tool_use":
+            return "I have tools available but cannot execute them without a tool manager."
         
-        # Return direct response
         return response.content[0].text
     
+    def _execute_sequential_rounds(self, query: str, conversation_history: Optional[str], 
+                                  tools: List, tool_manager) -> str:
+        """Execute up to 2 sequential rounds of tool calling"""
+        context = RoundContext(query, conversation_history)
+        max_rounds = 2
+        
+        while context.round_number <= max_rounds:
+            # Execute current round
+            round_result = self._execute_single_round(context, tools)
+            
+            # Execute tools if present
+            if round_result.has_tool_use and tool_manager:
+                success = self._execute_tools_for_round(round_result, context, tool_manager)
+                if not success:
+                    return "I encountered an error while searching for information."
+            
+            # Check termination conditions after tool execution
+            if not self._should_continue_rounds(context.round_number, round_result, max_rounds):
+                return round_result.get_text_content()
+            
+            context.increment_round()
+        
+        # Return final response after max rounds
+        return round_result.get_text_content()
+    
+    def _execute_single_round(self, context: RoundContext, tools: Optional[List] = None) -> RoundResult:
+        """Execute a single round of API call"""
+        try:
+            # Build system prompt with conversation history if available
+            system_content = self._build_system_prompt(context)
+            
+            # Prepare API parameters
+            api_params = {
+                **self.base_params,
+                "messages": context.messages,
+                "system": system_content
+            }
+            
+            # Add tools if available
+            if tools:
+                api_params["tools"] = tools
+                api_params["tool_choice"] = {"type": "auto"}
+            
+            # Make API call
+            response = self.client.messages.create(**api_params)
+            has_tool_use = response.stop_reason == "tool_use"
+            
+            return RoundResult(response, has_tool_use, execution_success=True)
+            
+        except Exception as e:
+            # Create fallback response for API errors
+            class MockResponse:
+                def __init__(self, text):
+                    self.content = [type('obj', (object,), {'text': text})()]
+            
+            fallback_response = MockResponse(f"I apologize, but I encountered an error: {str(e)}")
+            return RoundResult(fallback_response, has_tool_use=False, execution_success=False, error=str(e))
+    
+    def _should_continue_rounds(self, round_num: int, round_result: RoundResult, max_rounds: int) -> bool:
+        """Check if we should continue to next round"""
+        # Condition 1: Maximum rounds reached
+        if round_num >= max_rounds:
+            return False
+            
+        # Condition 2: No tool use in response
+        if not round_result.has_tool_use:
+            return False
+            
+        # Condition 3: Tool execution failed
+        if not round_result.execution_success:
+            return False
+            
+        return True
+    
+    def _execute_tools_for_round(self, round_result: RoundResult, context: RoundContext, tool_manager) -> bool:
+        """Execute tools for current round and update context"""
+        try:
+            # Add assistant's response to context
+            context.add_assistant_message(round_result.response.content)
+            
+            # Execute all tool calls
+            tool_results = []
+            for content_block in round_result.response.content:
+                if content_block.type == "tool_use":
+                    result = tool_manager.execute_tool(
+                        content_block.name, 
+                        **content_block.input
+                    )
+                    
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": content_block.id,
+                        "content": result
+                    })
+            
+            # Add tool results to context
+            if tool_results:
+                context.add_user_message(tool_results)
+            
+            return True
+            
+        except Exception as e:
+            # Add error message to context for graceful degradation
+            error_result = [{
+                "type": "tool_result",
+                "tool_use_id": "error",
+                "content": f"Tool execution failed: {str(e)}"
+            }]
+            context.add_user_message(error_result)
+            return False
+    
+    def _build_system_prompt(self, context: RoundContext) -> str:
+        """Build system prompt with conversation history and round context"""
+        base_prompt = self.SYSTEM_PROMPT
+        
+        # Add conversation history if available
+        if context.conversation_history:
+            base_prompt += f"\n\nPrevious conversation:\n{context.conversation_history}"
+        
+        # Add round-specific guidance for round 2
+        if context.round_number == 2:
+            base_prompt += "\n\nROUND 2: You have previous tool results available. Use them to make informed decisions about additional searches or provide a comprehensive final answer."
+            
+        return base_prompt
+
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
-        """
+        """Legacy method for backward compatibility. 
         Handle execution of tool calls and get follow-up response.
         
         Args:
