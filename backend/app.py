@@ -1,26 +1,24 @@
-import warnings
-warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
 import os
+import warnings
+from typing import List, Optional
 
 from config import config
-from rag_system import RAGSystem
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from models import SourceObject
+from pydantic import BaseModel
+from rag_system import RAGSystem
+
+warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
 
 # Initialize FastAPI app
 app = FastAPI(title="Course Materials RAG System", root_path="")
 
 # Add trusted host middleware for proxy
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["*"]
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # Enable CORS with proper settings for proxy
 app.add_middleware(
@@ -35,25 +33,33 @@ app.add_middleware(
 # Initialize RAG system
 rag_system = RAGSystem(config)
 
+
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
     """Request model for course queries"""
+
     query: str
     session_id: Optional[str] = None
 
+
 class QueryResponse(BaseModel):
     """Response model for course queries"""
+
     answer: str
     sources: List[SourceObject]
     session_id: str
     source_summary: Optional[str] = None  # Summary like "Based on 3 courses, 5 lessons"
 
+
 class CourseStats(BaseModel):
     """Response model for course statistics"""
+
     total_courses: int
     course_titles: List[str]
 
+
 # API Endpoints
+
 
 @app.post("/api/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
@@ -63,18 +69,47 @@ async def query_documents(request: QueryRequest):
         session_id = request.session_id
         if not session_id:
             session_id = rag_system.session_manager.create_session()
-        
+
         # Process query using RAG system
         answer, sources, source_summary = rag_system.query(request.query, session_id)
-        
+
         return QueryResponse(
             answer=answer,
             sources=sources,
             session_id=session_id,
-            source_summary=source_summary
+            source_summary=source_summary,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_message = str(e)
+
+        # Provide user-friendly error messages
+        if "overloaded" in error_message.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="The AI service is currently experiencing high demand. Please try again in a few minutes.",
+            )
+        elif "rate limit" in error_message.lower():
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests. Please wait a moment before trying again.",
+            )
+        elif "connection" in error_message.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to connect to AI service. Please check your internet connection and try again.",
+            )
+        elif "api" in error_message.lower():
+            raise HTTPException(
+                status_code=502,
+                detail="AI service is temporarily unavailable. Please try again later.",
+            )
+        else:
+            # Generic error for unknown issues
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred. Please try again.",
+            )
+
 
 @app.get("/api/courses", response_model=CourseStats)
 async def get_course_stats():
@@ -83,10 +118,39 @@ async def get_course_stats():
         analytics = rag_system.get_course_analytics()
         return CourseStats(
             total_courses=analytics["total_courses"],
-            course_titles=analytics["course_titles"]
+            course_titles=analytics["course_titles"],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_message = str(e)
+
+        # Provide user-friendly error messages
+        if "overloaded" in error_message.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="The AI service is currently experiencing high demand. Please try again in a few minutes.",
+            )
+        elif "rate limit" in error_message.lower():
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests. Please wait a moment before trying again.",
+            )
+        elif "connection" in error_message.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to connect to AI service. Please check your internet connection and try again.",
+            )
+        elif "api" in error_message.lower():
+            raise HTTPException(
+                status_code=502,
+                detail="AI service is temporarily unavailable. Please try again later.",
+            )
+        else:
+            # Generic error for unknown issues
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred. Please try again.",
+            )
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -95,16 +159,15 @@ async def startup_event():
     if os.path.exists(docs_path):
         print("Loading initial documents...")
         try:
-            courses, chunks = rag_system.add_course_folder(docs_path, clear_existing=False)
+            courses, chunks = rag_system.add_course_folder(
+                docs_path, clear_existing=False
+            )
             print(f"Loaded {courses} courses with {chunks} chunks")
         except Exception as e:
             print(f"Error loading documents: {e}")
 
+
 # Custom static file handler with no-cache headers for development
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
-from pathlib import Path
 
 
 class DevStaticFiles(StaticFiles):
@@ -116,7 +179,7 @@ class DevStaticFiles(StaticFiles):
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
-    
-    
+
+
 # Serve static files for the frontend
 app.mount("/", StaticFiles(directory="../frontend", html=True), name="static")

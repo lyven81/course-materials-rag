@@ -75,9 +75,18 @@ async function sendMessage() {
             })
         });
 
-        if (!response.ok) throw new Error('Query failed');
+        let data;
+        if (!response.ok) {
+            // Try to get error details from response
+            try {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Request failed with status ${response.status}`);
+            } catch (jsonError) {
+                throw new Error(`Request failed with status ${response.status}`);
+            }
+        }
 
-        const data = await response.json();
+        data = await response.json();
         
         // Update session ID if new
         if (!currentSessionId) {
@@ -91,7 +100,22 @@ async function sendMessage() {
     } catch (error) {
         // Replace loading message with error
         loadingMessage.remove();
-        addMessage(`Error: ${error.message}`, 'assistant');
+        
+        // Provide helpful error messages based on error type
+        let errorMessage = error.message;
+        if (error.message.includes('overloaded') || error.message.includes('high demand')) {
+            errorMessage = '⚠️ The AI service is currently experiencing high demand. Please try again in a few minutes.';
+        } else if (error.message.includes('rate limit')) {
+            errorMessage = '⏳ Please wait a moment before sending another message.';
+        } else if (error.message.includes('connection') || error.message.includes('Failed to fetch')) {
+            errorMessage = '🔌 Connection issue. Please check your internet connection and try again.';
+        } else if (error.message.includes('temporarily unavailable')) {
+            errorMessage = '🔧 AI service is temporarily unavailable. Please try again later.';
+        } else if (!error.message || error.message === 'Query failed') {
+            errorMessage = '❌ Something went wrong. Please try again.';
+        }
+        
+        addMessage(errorMessage, 'assistant');
     } finally {
         chatInput.disabled = false;
         sendButton.disabled = false;

@@ -26,6 +26,17 @@ uploads/
 *.swp
 *.swo
 
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
