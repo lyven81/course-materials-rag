@@ -10,84 +10,76 @@
     <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
-    <div class="container">
-        <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark/light mode">
-            <svg class="theme-icon sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                <line x1="1" y1="12" x2="3" y2="12"></line>
-                <line x1="21" y1="12" x2="23" y2="12"></line>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-            <svg class="theme-icon moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m21 12.79c-.9 1.05-2.19 1.71-3.58 1.71-2.69 0-4.87-2.18-4.87-4.87 0-1.39.66-2.68 1.71-3.58-.6-.1-1.21-.15-1.84-.15-5.52 0-10 4.48-10 10s4.48 10 10 10c5.52 0 10-4.48 10-10 0-.63-.05-1.24-.15-1.84z"></path>
-            </svg>
-        </button>
+    <!-- Theme Toggle Button - Top Right -->
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark/light mode">
+        <svg class="theme-icon sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="theme-icon moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21 12.79c-.9 1.05-2.19 1.71-3.58 1.71-2.69 0-4.87-2.18-4.87-4.87 0-1.39.66-2.68 1.71-3.58-.6-.1-1.21-.15-1.84-.15-5.52 0-10 4.48-10 10s4.48 10 10 10c5.52 0 10-4.48 10-10 0-.63-.05-1.24-.15-1.84z"></path>
+        </svg>
+    </button>
 
-        <div class="main-content">
-            <!-- Header Section -->
-            <header class="app-header">
-                <h1 class="app-title">Course Materials RAG</h1>
-                <p class="app-subtitle">课程材料助手 - 提供课程、讲师和内容相关问题的帮助</p>
-            </header>
-            
-            <!-- Inline Navigation -->
-            <nav class="sidebar">
-                <div class="sidebar-section">
-                    <button id="newChatButton" class="new-chat-button">New Chat</button>
-                </div>
-                <div class="sidebar-section">
-                    <button class="nav-button courses" onclick="showCourseInfo()">Courses</button>
-                </div>
-                <div class="sidebar-section">
-                    <button class="nav-button try-asking" onclick="showSuggestedQuestions()">Try Asking</button>
-                </div>
-            </nav>
-            
-            <!-- Hidden course stats for reference -->
-            <div id="courseStats" style="display: none;">
-                <div class="stat-item">
-                    <span class="stat-label">Number of courses:</span>
-                    <span class="stat-value" id="totalCourses">-</span>
-                </div>
-                <div class="course-titles" id="courseTitles">
-                    <span class="loading">Loading...</span>
-                </div>
+    <!-- Main Centered Container -->
+    <div class="main-container">
+        <!-- Header Section -->
+        <header class="app-header">
+            <h1 class="app-title">Course Materials RAG</h1>
+            <p class="app-subtitle">课程材料助手 - 提供课程、讲师和内容相关问题的帮助</p>
+        </header>
+        
+        <!-- Inline Navigation -->
+        <nav class="navigation">
+            <button id="newChatButton" class="nav-button new-chat">New Chat</button>
+            <button class="nav-button courses" onclick="showCourseInfo()">Courses</button>
+            <button class="nav-button try-asking" onclick="showSuggestedQuestions()">Try Asking</button>
+        </nav>
+        
+        <!-- Hidden course stats for reference -->
+        <div id="courseStats" style="display: none;">
+            <div class="stat-item">
+                <span class="stat-label">Number of courses:</span>
+                <span class="stat-value" id="totalCourses">-</span>
             </div>
-            
-            <!-- Hidden suggested questions for reference -->
-            <div class="suggested-items" style="display: none;">
-                <button class="suggested-item" data-question="What is the outline of the &quot;MCP: Build Rich-Context AI Apps with Anthropic&quot; course?">Outline of a course</button>
-                <button class="suggested-item" data-question="Are there any courses that include a Chatbot implementation?">Courses about Chatbot</button>
-                <button class="suggested-item" data-question="Are there any courses that explain what RAG is?">Courses explaining RAG</button>
-                <button class="suggested-item" data-question="What was covered in lesson 5 of the MCP course?">Details of a course's lesson</button>
+            <div class="course-titles" id="courseTitles">
+                <span class="loading">Loading...</span>
             </div>
-
-            <!-- Main Chat Area -->
-            <main class="chat-main">
-                <div class="chat-container">
-                    <div id="chatMessages" class="chat-messages"></div>
-                    <div class="chat-input-container">
-                        <input 
-                            type="text" 
-                            id="chatInput" 
-                            placeholder="Ask about courses, lessons, or specific content..."
-                            autocomplete="off"
-                        >
-                        <button id="sendButton">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </main>
         </div>
+        
+        <!-- Hidden suggested questions for reference -->
+        <div class="suggested-items" style="display: none;">
+            <button class="suggested-item" data-question="What is the outline of the &quot;MCP: Build Rich-Context AI Apps with Anthropic&quot; course?">Outline of a course</button>
+            <button class="suggested-item" data-question="Are there any courses that include a Chatbot implementation?">Courses about Chatbot</button>
+            <button class="suggested-item" data-question="Are there any courses that explain what RAG is?">Courses explaining RAG</button>
+            <button class="suggested-item" data-question="What was covered in lesson 5 of the MCP course?">Details of a course's lesson</button>
+        </div>
+
+        <!-- Chat Area -->
+        <main class="chat-area">
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-container">
+                <input 
+                    type="text" 
+                    id="chatInput" 
+                    placeholder="Ask about courses, lessons, or specific content..."
+                    autocomplete="off"
+                >
+                <button id="sendButton">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </main>
     </div>
 
 
