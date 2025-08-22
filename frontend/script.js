@@ -22,6 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
     createNewSession();
     loadCourseStats();
+    
+    // Ensure proper initial theme state after DOM is ready
+    setTimeout(() => {
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        updateThemeToggleState(currentTheme);
+    }, 100);
 });
 
 // Event Listeners
@@ -52,6 +58,18 @@ function setupEventListeners() {
             sendMessage();
         });
     });
+    
+    // Navigation button handlers
+    const coursesBtn = document.querySelector('.nav-button.courses');
+    const tryAskingBtn = document.querySelector('.nav-button.try-asking');
+    
+    if (coursesBtn) {
+        coursesBtn.addEventListener('click', showCourseInfo);
+    }
+    
+    if (tryAskingBtn) {
+        tryAskingBtn.addEventListener('click', showSuggestedQuestions);
+    }
 }
 
 
@@ -406,19 +424,86 @@ async function loadCourseStats() {
     }
 }
 
+// Navigation Functions
+function showCourseInfo() {
+    const courseStats = document.getElementById('courseStats');
+    const totalCourses = document.getElementById('totalCourses').textContent;
+    const courseTitles = document.getElementById('courseTitles').innerHTML;
+    
+    let courseList = 'No courses available';
+    if (courseTitles && !courseTitles.includes('Loading') && !courseTitles.includes('Failed')) {
+        const titles = courseTitles.split('</div>').map(title => 
+            title.replace(/<[^>]*>/g, '').trim()
+        ).filter(title => title);
+        
+        courseList = titles.length > 0 ? titles.join('\n• ') : 'No courses available';
+        if (titles.length > 0) courseList = '• ' + courseList;
+    }
+    
+    const message = `📚 **Course Information**\n\n**Total Courses:** ${totalCourses}\n\n**Available Courses:**\n${courseList}`;
+    
+    addMessage(message, 'assistant', null, null, false);
+}
+
+function showSuggestedQuestions() {
+    const suggestedQuestions = [
+        'What is the outline of the "MCP: Build Rich-Context AI Apps with Anthropic" course?',
+        'Are there any courses that include a Chatbot implementation?', 
+        'Are there any courses that explain what RAG is?',
+        'What was covered in lesson 5 of the MCP course?'
+    ];
+    
+    const questionList = suggestedQuestions.map(q => `• ${q}`).join('\n');
+    const message = `💡 **Try asking these questions:**\n\n${questionList}\n\nSimply click on any question above or type your own!`;
+    
+    addMessage(message, 'assistant', null, null, false);
+    
+    // Add click handlers to the suggested questions in this message
+    setTimeout(() => {
+        const lastMessage = chatMessages.lastElementChild;
+        if (lastMessage) {
+            const messageContent = lastMessage.querySelector('.message-content');
+            if (messageContent) {
+                // Make the questions clickable
+                suggestedQuestions.forEach(question => {
+                    const questionRegex = new RegExp(`• ${question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+                    messageContent.innerHTML = messageContent.innerHTML.replace(
+                        questionRegex,
+                        `<span class="clickable-question" data-question="${question}">• ${question}</span>`
+                    );
+                });
+                
+                // Add click handlers
+                messageContent.querySelectorAll('.clickable-question').forEach(span => {
+                    span.style.cursor = 'pointer';
+                    span.style.color = 'var(--primary-color)';
+                    span.style.textDecoration = 'underline';
+                    span.addEventListener('click', () => {
+                        const question = span.getAttribute('data-question');
+                        chatInput.value = question;
+                        sendMessage();
+                    });
+                });
+            }
+        }
+    }, 100);
+}
+
 // Theme Management Functions
 function initializeTheme() {
-    // Check for saved theme preference or default to system preference
+    // Check for saved theme preference or default to light mode
     const savedTheme = localStorage.getItem('theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
-    const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+    // Default to light mode as specified in requirements
+    const theme = savedTheme || 'light';
     setTheme(theme);
     
-    // Listen for system theme changes
+    // Listen for system theme changes only if no preference is saved
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
         if (!localStorage.getItem('theme')) {
-            setTheme(e.matches ? 'dark' : 'light');
+            // Even with system preference, start with light mode by default
+            // Users need to manually toggle to dark mode
+            setTheme('light');
         }
     });
 }
@@ -436,14 +521,39 @@ function toggleTheme() {
 }
 
 function setTheme(theme) {
-    if (theme === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light');
-        themeToggle.setAttribute('aria-label', 'Switch to dark mode');
+    // Apply theme
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        themeToggle.setAttribute('aria-label', 'Switch to light mode');
+        themeToggle.setAttribute('title', 'Switch to light mode');
     } else {
         document.documentElement.removeAttribute('data-theme');
-        themeToggle.setAttribute('aria-label', 'Switch to light mode');
+        themeToggle.setAttribute('aria-label', 'Switch to dark mode');
+        themeToggle.setAttribute('title', 'Switch to dark mode');
     }
     
-    // Save theme preference
+    // Save theme preference to localStorage
     localStorage.setItem('theme', theme);
+    
+    // Update theme toggle button state
+    updateThemeToggleState(theme);
+}
+
+function updateThemeToggleState(theme) {
+    const sunIcon = themeToggle.querySelector('.sun-icon');
+    const moonIcon = themeToggle.querySelector('.moon-icon');
+    
+    if (theme === 'dark') {
+        // Dark mode: show sun icon (to switch to light)
+        sunIcon.style.opacity = '1';
+        sunIcon.style.transform = 'rotate(0deg) scale(1)';
+        moonIcon.style.opacity = '0';
+        moonIcon.style.transform = 'rotate(-180deg) scale(0)';
+    } else {
+        // Light mode: show moon icon (to switch to dark)
+        sunIcon.style.opacity = '0';
+        sunIcon.style.transform = 'rotate(180deg) scale(0)';
+        moonIcon.style.opacity = '1';
+        moonIcon.style.transform = 'rotate(0deg) scale(1)';
+    }
 }
